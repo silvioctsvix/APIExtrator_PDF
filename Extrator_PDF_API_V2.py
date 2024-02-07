@@ -5,6 +5,7 @@ from PIL import Image
 import requests
 import io
 import tempfile
+import os
 
 app = Flask(__name__)
 
