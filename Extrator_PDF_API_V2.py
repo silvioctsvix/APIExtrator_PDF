@@ -11,12 +11,22 @@ import os
 app = Flask(__name__)
 
 def baixar_arquivo_pdf(url):
-    """Baixa um arquivo PDF do URL fornecido e retorna o objeto BytesIO."""
     resposta = requests.get(url)
     if resposta.status_code == 200:
         return io.BytesIO(resposta.content)
     else:
         raise Exception(f"Erro ao baixar o arquivo PDF: Status {resposta.status_code}")
+
+def interpretar_sequencia_paginas(sequencia):
+    paginas = []
+    partes = sequencia.split(',')
+    for parte in partes:
+        if '-' in parte:
+            inicio, fim = map(int, parte.split('-'))
+            paginas.extend(range(inicio, fim + 1))
+        else:
+            paginas.append(int(parte))
+    return paginas
 
 def extrair_texto_ocr_da_imagem(doc, pagina_numero):
     texto_ocr = ''
@@ -37,11 +47,12 @@ def processar_pagina(doc, pagina_numero):
     texto_pagina += extrair_texto_ocr_da_imagem(doc, pagina_numero)
     return texto_pagina
 
-def ocrizar_pdf(arquivo_pdf):
+def ocrizar_pdf(arquivo_pdf, sequencia_paginas):
     texto_ocr = ''
+    paginas_a_processar = interpretar_sequencia_paginas(sequencia_paginas)
     with fitz.open(stream=arquivo_pdf, filetype="pdf") as doc:
         with ThreadPoolExecutor() as executor:
-            resultados = executor.map(lambda pagina: processar_pagina(doc, pagina), range(len(doc)))
+            resultados = executor.map(lambda pagina: processar_pagina(doc, pagina) if pagina in paginas_a_processar else '', range(len(doc)))
             texto_ocr = ''.join(resultados)
     return texto_ocr
 
@@ -49,12 +60,13 @@ def ocrizar_pdf(arquivo_pdf):
 def extrair_texto():
     data = request.json
     url_pdf = data.get('url')
-    if not url_pdf:
-        return jsonify({"erro": "URL não fornecida"}), 400
+    sequencia_paginas = data.get('paginas')  # Novo parâmetro de entrada
+    if not url_pdf or sequencia_paginas is None:
+        return jsonify({"erro": "URL ou sequência de páginas não fornecida"}), 400
 
     try:
         arquivo_pdf = baixar_arquivo_pdf(url_pdf)
-        texto_ocr = ocrizar_pdf(arquivo_pdf)
+        texto_ocr = ocrizar_pdf(arquivo_pdf, sequencia_paginas)
         return jsonify({"texto": texto_ocr})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
