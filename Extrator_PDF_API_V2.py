@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import fitz  # PyMuPDF
 import pytesseract
-from PIL import Image, ImageEnhance
+from PIL import Image
 import os
 import tempfile
 import io
@@ -30,7 +30,6 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
     pix = pagina.get_pixmap()
     imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     
-    # Simplificação para reduzir a carga de processamento
     texto_ocr += pytesseract.image_to_string(imagem_original, lang='por')
     return texto_ocr
 
@@ -47,10 +46,19 @@ def ocrizar_pdf(caminho_pdf, paginas_param):
 
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
-    logging.info("Convertendo PDF")
+    logging.info("Iniciando conversão do PDF")
     paginas = request.form.get('paginas', '')
-    file_content = request.files['file'].read() if 'file' in request.files else base64.b64decode(request.form['file'])
-    
+
+    # Verifica se o arquivo foi enviado como parte de um form ou codificado em base64
+    if 'file' in request.files:
+        file_content = request.files['file'].read()
+    elif 'file' in request.form:
+        file_content_base64 = request.form['file']
+        file_content = base64.b64decode(file_content_base64)
+    else:
+        return jsonify({"error": "Nenhum arquivo foi enviado"}), 400
+
+    # Criação de um arquivo temporário para o PDF
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "uploaded_file.pdf")
     with open(temp_path, 'wb') as f:
