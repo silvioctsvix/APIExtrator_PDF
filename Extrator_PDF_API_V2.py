@@ -43,12 +43,12 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
 
 def extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina):
     texto_ocr = ''
-    # Sempre extrai texto selecionável se houver
     texto_selecionavel = pagina.get_text("text")
-    texto_ocr += texto_selecionavel
-    # Sempre tenta ocrizar a página inteira, independentemente da presença de texto selecionável
-    texto_ocr += extrair_texto_ocr_de_pagina_com_imagem(pagina)
-    return texto_ocr
+    if texto_selecionavel.strip():  # Verifica se o texto selecionável é apenas espaço em branco
+        return texto_selecionavel
+    else:
+        # Processa a página como imagem se não houver texto selecionável
+        return extrair_texto_ocr_de_pagina_com_imagem(pagina)
 
 def ocrizar_pdf(caminho_pdf, paginas_param):
     texto_ocr = ''
@@ -69,6 +69,7 @@ def convert_pdf():
         return jsonify({"error": "Parâmetro de páginas não enviado"}), 400
     paginas = request.form['paginas']
 
+    # Tratamento de arquivos recebidos tanto como arquivos binários quanto como strings base64
     if 'file' in request.files:
         file = request.files['file']
         if file.filename == '':
