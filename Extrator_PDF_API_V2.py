@@ -11,8 +11,12 @@ app = Flask(__name__)
 # Certifique-se de configurar o caminho para o executável do Tesseract OCR, se necessário.
 # Exemplo: pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-def extrair_texto_ocr_da_imagem(doc, pagina):
+def extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina):
     texto_ocr = ''
+    # Verifica se há texto selecionável na página antes de tentar OCR nas imagens
+    if pagina.get_text("text"):
+        return pagina.get_text("text")
+
     imagens = pagina.get_images(full=True)
     for img_index in imagens:
         xref = img_index[0]
@@ -31,8 +35,8 @@ def ocrizar_pdf(caminho_pdf):
                 # Extrai texto selecionável
                 texto = pagina.get_text()
                 texto_ocr += texto
-                # Extrai texto de imagens usando OCR
-                texto_ocr += extrair_texto_ocr_da_imagem(doc, pagina)
+                # Extrai texto de imagens usando OCR com a função aperfeiçoada
+                texto_ocr += extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina)
     except Exception as e:
         return str(e)
     return texto_ocr
