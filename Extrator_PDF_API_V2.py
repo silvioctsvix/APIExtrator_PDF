@@ -11,31 +11,29 @@ app = Flask(__name__)
 # Certifique-se de configurar o caminho para o executável do Tesseract OCR, se necessário.
 # Exemplo: pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+def extrair_texto_ocr_de_pagina_com_imagem(doc, pagina):
+    texto_ocr = ''
+    pix = pagina.get_pixmap()
+    imagem = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    texto_ocr += pytesseract.image_to_string(imagem, lang='por')
+    return texto_ocr
+
 def extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina):
     texto_ocr = ''
     # Verifica se há texto selecionável na página antes de tentar OCR nas imagens
-    if pagina.get_text("text"):
-        return pagina.get_text("text")
-
-    imagens = pagina.get_images(full=True)
-    for img_index in imagens:
-        xref = img_index[0]
-        base_image = doc.extract_image(xref)
-        image_bytes = base_image["image"]
-        # Convertendo bytes da imagem para um objeto PIL Image
-        imagem = Image.open(io.BytesIO(image_bytes))
-        texto_ocr += pytesseract.image_to_string(imagem)
-    return texto_ocr
+    texto_selecionavel = pagina.get_text("text")
+    if texto_selecionavel:
+        return texto_selecionavel
+    else:
+        # Para páginas sem texto selecionável, aplica a abordagem otimizada de OCR em toda a página
+        return extrair_texto_ocr_de_pagina_com_imagem(doc, pagina)
 
 def ocrizar_pdf(caminho_pdf):
     texto_ocr = ''
     try:
         with fitz.open(caminho_pdf) as doc:
             for pagina in doc:
-                # Extrai texto selecionável
-                texto = pagina.get_text()
-                texto_ocr += texto
-                # Extrai texto de imagens usando OCR com a função aperfeiçoada
+                # Utiliza a função aperfeiçoada para extrair texto, seja diretamente ou via OCR
                 texto_ocr += extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina)
     except Exception as e:
         return str(e)
