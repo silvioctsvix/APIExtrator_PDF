@@ -8,39 +8,29 @@ import io
 
 app = Flask(__name__)
 
-# Função otimizada para extrair texto de páginas com imagens
-def extrair_texto_ocr_de_pagina_com_imagem(doc, pagina):
+def parse_paginas_param(paginas_param):
+    """
+    Converte o parâmetro de páginas em uma lista de números de página.
+    Aceita formatos como '1-5', '7,9,15' ou uma combinação '1-3,5'.
+    """
+    paginas = []
+    for parte in paginas_param.split(','):
+        if '-' in parte:
+            inicio, fim = map(int, parte.split('-'))
+            paginas.extend(range(inicio, fim + 1))
+        else:
+            paginas.append(int(parte))
+    return paginas
+
+# Funções extrair_texto_ocr_de_pagina_com_imagem e extrair_texto_ocr_da_imagem_aperfeicoada permanecem inalteradas
+
+def ocrizar_pdf(caminho_pdf, paginas_param):
     texto_ocr = ''
-    pix = pagina.get_pixmap()
-    imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-
-    # Redimensionamento da imagem - Reduz para 1500px de largura mantendo a proporção
-    base_width = 1500
-    w_percent = (base_width / float(imagem_original.size[0]))
-    h_size = int((float(imagem_original.size[1]) * float(w_percent)))
-    imagem_redimensionada = imagem_original.resize((base_width, h_size), Image.ANTIALIAS)
-
-    # Ajuste de contraste
-    enhancer = ImageEnhance.Contrast(imagem_redimensionada)
-    imagem_contraste = enhancer.enhance(2)  # Ajuste o fator conforme necessário
-
-    texto_ocr += pytesseract.image_to_string(imagem_contraste, lang='por')
-    return texto_ocr
-
-def extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina):
-    texto_ocr = ''
-    texto_selecionavel = pagina.get_text("text")
-    if texto_selecionavel:
-        return texto_selecionavel
-    else:
-        # Aplica a abordagem otimizada de OCR em toda a página para páginas sem texto selecionável
-        return extrair_texto_ocr_de_pagina_com_imagem(doc, pagina)
-
-def ocrizar_pdf(caminho_pdf):
-    texto_ocr = ''
+    paginas_a_processar = parse_paginas_param(paginas_param)
     try:
         with fitz.open(caminho_pdf) as doc:
-            for pagina in doc:
+            for num_pagina in paginas_a_processar:
+                pagina = doc.load_page(num_pagina - 1)  # PyMuPDF usa indexação base 0
                 texto_ocr += extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina)
     except Exception as e:
         return str(e)
@@ -48,10 +38,12 @@ def ocrizar_pdf(caminho_pdf):
 
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
-    if 'file' not in request.files:
-        return jsonify({"error": "Arquivo não enviado"}), 400
+    if 'file' not in request.files or 'paginas' not in request.form:
+        return jsonify({"error": "Arquivo ou parâmetro de páginas não enviado"}), 400
     
     file = request.files['file']
+    paginas = request.form['paginas']  # Exemplo: "1-5,7,9,15"
+    
     if file.filename == '':
         return jsonify({"error": "Nenhum arquivo selecionado"}), 400
     
@@ -59,7 +51,7 @@ def convert_pdf():
     temp_path = os.path.join(temp_dir, file.filename)
     file.save(temp_path)
     
-    texto_ocr = ocrizar_pdf(temp_path)
+    texto_ocr = ocrizar_pdf(temp_path, paginas)
     
     os.remove(temp_path)
     os.rmdir(temp_dir)
