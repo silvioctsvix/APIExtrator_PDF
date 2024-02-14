@@ -22,7 +22,32 @@ def parse_paginas_param(paginas_param):
             paginas.append(int(parte))
     return paginas
 
-# Funções extrair_texto_ocr_de_pagina_com_imagem e extrair_texto_ocr_da_imagem_aperfeicoada permanecem inalteradas
+def extrair_texto_ocr_de_pagina_com_imagem(pagina):
+    texto_ocr = ''
+    pix = pagina.get_pixmap()
+    imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+    # Redimensionamento da imagem - Reduz para 1500px de largura mantendo a proporção
+    base_width = 1500
+    w_percent = (base_width / float(imagem_original.size[0]))
+    h_size = int((float(imagem_original.size[1]) * float(w_percent)))
+    imagem_redimensionada = imagem_original.resize((base_width, h_size), Image.ANTIALIAS)
+
+    # Ajuste de contraste
+    enhancer = ImageEnhance.Contrast(imagem_redimensionada)
+    imagem_contraste = enhancer.enhance(2)  # Ajuste o fator conforme necessário
+
+    texto_ocr += pytesseract.image_to_string(imagem_contraste, lang='por')
+    return texto_ocr
+
+def extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina):
+    texto_ocr = ''
+    texto_selecionavel = pagina.get_text("text")
+    if texto_selecionavel.strip():  # Verifica se o texto selecionável é apenas espaço em branco
+        return texto_selecionavel
+    else:
+        # Processa a página como imagem se não houver texto selecionável
+        return extrair_texto_ocr_de_pagina_com_imagem(pagina)
 
 def ocrizar_pdf(caminho_pdf, paginas_param):
     texto_ocr = ''
@@ -30,8 +55,9 @@ def ocrizar_pdf(caminho_pdf, paginas_param):
     try:
         with fitz.open(caminho_pdf) as doc:
             for num_pagina in paginas_a_processar:
-                pagina = doc.load_page(num_pagina - 1)  # PyMuPDF usa indexação base 0
-                texto_ocr += extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina)
+                if num_pagina <= len(doc):  # Verifica se o número da página é válido
+                    pagina = doc.load_page(num_pagina - 1)  # PyMuPDF usa indexação base 0
+                    texto_ocr += extrair_texto_ocr_da_imagem_aperfeicoada(doc, pagina)
     except Exception as e:
         return str(e)
     return texto_ocr
