@@ -31,7 +31,8 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
     imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     
     # Configurações customizadas do Tesseract para otimizar a performance
-    custom_config = '--oem 1 --psm 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -c textord_no_block=1'
+    #custom_config = '--oem 1 --psm 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -c textord_no_block=1'
+    custom_config = '--oem 1 --psm 3'
     texto_ocr += pytesseract.image_to_string(imagem_original, lang='por', config=custom_config)
     return texto_ocr
 
