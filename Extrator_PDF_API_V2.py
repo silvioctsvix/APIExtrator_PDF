@@ -30,7 +30,9 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
     pix = pagina.get_pixmap()
     imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     
-    texto_ocr += pytesseract.image_to_string(imagem_original, lang='por')
+    # Configurações customizadas do Tesseract para otimizar a performance
+    custom_config = '--oem 1 --psm 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -c textord_no_block=1'
+    texto_ocr += pytesseract.image_to_string(imagem_original, lang='por', config=custom_config)
     return texto_ocr
 
 def ocrizar_pdf(caminho_pdf, paginas_param):
@@ -49,7 +51,6 @@ def convert_pdf():
     logging.info("Iniciando conversão do PDF")
     paginas = request.form.get('paginas', '')
 
-    # Verifica se o arquivo foi enviado como parte de um form ou codificado em base64
     if 'file' in request.files:
         file_content = request.files['file'].read()
     elif 'file' in request.form:
@@ -58,7 +59,6 @@ def convert_pdf():
     else:
         return jsonify({"error": "Nenhum arquivo foi enviado"}), 400
 
-    # Criação de um arquivo temporário para o PDF
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "uploaded_file.pdf")
     with open(temp_path, 'wb') as f:
@@ -66,7 +66,6 @@ def convert_pdf():
     
     texto_ocr = ocrizar_pdf(temp_path, paginas)
     
-    # Limpeza de recursos
     os.remove(temp_path)
     os.rmdir(temp_dir)
     
