@@ -49,11 +49,14 @@ def ocrizar_pdf(caminho_pdf, paginas_param):
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
     logging.info("Iniciando conversão do PDF")
-    if 'application/pdf' not in request.headers['Content-Type']:
+    # Verifica se o content-type é application/pdf
+    if 'application/pdf' not in request.headers.get('Content-Type', ''):
+        logging.error("Formato de arquivo não suportado")
         return jsonify({"error": "Formato de arquivo não suportado"}), 400
 
     file_content = request.data
     if len(file_content) == 0:
+        logging.error("Arquivo recebido está vazio")
         return jsonify({"error": "Arquivo recebido está vazio"}), 400
 
     temp_dir = tempfile.mkdtemp()
@@ -67,7 +70,7 @@ def convert_pdf():
         texto_ocr = ocrizar_pdf(temp_path, paginas_param)
     except Exception as e:
         logging.error(f"Erro ao processar PDF: {e}")
-        return jsonify({"error": "Falha ao processar PDF"}), 500
+        return jsonify({"error": f"Falha ao processar PDF: {str(e)}"}), 500
     finally:
         os.remove(temp_path)
         os.rmdir(temp_dir)
@@ -75,7 +78,7 @@ def convert_pdf():
     if texto_ocr:
         return jsonify({"texto": texto_ocr}), 200
     else:
-        return jsonify({"error": "Falha ao extrair texto do PDF"}), 500
+        return jsonify({"error": "Nenhum texto extraído do PDF"}), 200
 
 if __name__ == '__main__':
     pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
