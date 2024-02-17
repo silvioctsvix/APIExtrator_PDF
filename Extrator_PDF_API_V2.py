@@ -50,14 +50,21 @@ def convert_pdf():
     logging.info("Iniciando conversão do PDF")
     paginas = request.form.get('paginas', '')
 
-    file_content_base64 = request.files['file'].read()  # Assume que 'file' é enviado como um arquivo codificado em base64
-    file_content = base64.b64decode(file_content_base64)
+    # Assume que o arquivo é enviado via multipart/form-data como um arquivo codificado em base64
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum arquivo foi enviado"}), 400
+
+    file_content_base64 = request.files['file'].read()  # Lê o conteúdo do arquivo enviado
+    try:
+        file_content = base64.b64decode(file_content_base64)
+    except base64.binascii.Error as e:
+        return jsonify({"error": "Falha na decodificação do arquivo base64"}), 400
 
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "uploaded_file.pdf")
     with open(temp_path, 'wb') as f:
         f.write(file_content)
-    
+
     texto_ocr = ocrizar_pdf(temp_path, paginas)
     
     os.remove(temp_path)
@@ -67,6 +74,7 @@ def convert_pdf():
         return jsonify({"texto": texto_ocr}), 200
     else:
         return jsonify({"error": "Falha ao extrair texto do PDF"}), 500
+
 
 if __name__ == '__main__':
     pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
