@@ -4,7 +4,6 @@ import pytesseract
 from PIL import Image
 import os
 import tempfile
-import io
 import base64
 import logging
 
@@ -29,9 +28,8 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
     texto_ocr = ''
     pix = pagina.get_pixmap()
     imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    
-    # Configurações customizadas do Tesseract para otimizar a performance
-    #custom_config = '--oem 1 --psm 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -c textord_no_block=1'
+
+    # Configurações customizadas do Tesseract podem ser ajustadas conforme a necessidade
     custom_config = '--oem 1 --psm 3'
     texto_ocr += pytesseract.image_to_string(imagem_original, lang='por', config=custom_config)
     return texto_ocr
@@ -52,13 +50,8 @@ def convert_pdf():
     logging.info("Iniciando conversão do PDF")
     paginas = request.form.get('paginas', '')
 
-    if 'file' in request.files:
-        file_content = request.files['file'].read()
-    elif 'file' in request.form:
-        file_content_base64 = request.form['file']
-        file_content = base64.b64decode(file_content_base64)
-    else:
-        return jsonify({"error": "Nenhum arquivo foi enviado"}), 400
+    file_content_base64 = request.files['file'].read()  # Assume que 'file' é enviado como um arquivo codificado em base64
+    file_content = base64.b64decode(file_content_base64)
 
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, "uploaded_file.pdf")
