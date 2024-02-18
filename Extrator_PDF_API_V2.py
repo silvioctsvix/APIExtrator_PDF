@@ -31,7 +31,7 @@ def extrair_texto_ocr_de_pagina_com_imagem(pagina):
 
     # Ajuste de contraste
     enhancer = ImageEnhance.Contrast(imagem_original)
-    imagem_contrastada = enhancer.enhance(1.3)  # O fator de contraste, >1 aumenta o contraste
+    imagem_contrastada = enhancer.enhance(1.2)  # O fator de contraste, >1 aumenta o contraste
 
     custom_config = '--oem 1 --psm 3'
     texto_ocr += pytesseract.image_to_string(imagem_contrastada, lang='por', config=custom_config)
