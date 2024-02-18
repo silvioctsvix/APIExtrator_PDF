@@ -26,7 +26,7 @@ def parse_paginas_param(paginas_param):
 def preprocess_image(imagem_original):
     logging.info("Preprocessando imagem para OCR")
     # Removendo a binarização e mantendo outros ajustes para melhorar o OCR
-    imagem = ImageEnhance.Contrast(imagem_original).enhance(2.0)  # Aumentar contraste
+    imagem = ImageEnhance.Contrast(imagem_original).enhance(1.1)  # Aumentar contraste
     imagem = imagem.filter(ImageFilter.MedianFilter())  # Remoção de ruído
     
     return imagem
