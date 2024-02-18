@@ -1,10 +1,10 @@
 from flask import Flask, request, jsonify
 import fitz  # PyMuPDF
 import pytesseract
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 import logging
 import tempfile
-import os
+import io
 
 # Configuração básica do logging
 logging.basicConfig(level=logging.INFO)
@@ -23,65 +23,58 @@ def parse_paginas_param(paginas_param):
                 paginas.append(int(parte))
     return paginas
 
-def extrair_texto_ocr_de_pagina_com_imagem(pagina):
-    logging.info("Extraindo texto OCR da página")
-    texto_ocr = ''
-    pix = pagina.get_pixmap()
-    imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-
+def preprocess_image(image_content):
+    """
+    Pré-processa a imagem para melhorar a qualidade da OCR.
+    """
+    # Converte o conteúdo binário para um objeto de imagem
+    image = Image.open(io.BytesIO(image_content))
+    
+    # Redimensionamento (opcional, ajustar conforme necessário)
+    base_width = 1500
+    w_percent = (base_width / float(image.size[0]))
+    h_size = int((float(image.size[1]) * float(w_percent)))
+    image = image.resize((base_width, h_size), Image.ANTIALIAS)
+    
+    # Binarização
+    image = image.convert('L')  # Convertendo para escala de cinza
+    threshold = 200
+    image = image.point(lambda p: p > threshold and 255)
+    
     # Ajuste de contraste
-    enhancer = ImageEnhance.Contrast(imagem_original)
-    imagem_contrastada = enhancer.enhance(1.1)  # O fator de contraste, >1 aumenta o contraste
-
-    custom_config = '--oem 1 --psm 3'
-    texto_ocr += pytesseract.image_to_string(imagem_contrastada, lang='por', config=custom_config)
-    return texto_ocr
-
-def ocrizar_pdf(caminho_pdf, paginas_param):
-    logging.info("Iniciando OCRização do PDF")
-    texto_ocr = ''
-    paginas_a_processar = parse_paginas_param(paginas_param)
-    with fitz.open(caminho_pdf) as doc:
-        for num_pagina in paginas_a_processar:
-            if num_pagina - 1 < len(doc):
-                pagina = doc.load_page(num_pagina - 1)
-                texto_ocr += extrair_texto_ocr_de_pagina_com_imagem(pagina)
-            else:
-                logging.warning(f"Página {num_pagina} não encontrada no documento.")
-    return texto_ocr
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2)  # Ajustar o fator conforme necessário
+    
+    # Remoção de ruído
+    image = image.filter(ImageFilter.MedianFilter())
+    
+    # Correção de rotação e alinhamento pode ser adicionada aqui se necessário
+    
+    return image
 
 @app.route('/convert', methods=['POST'])
-def convert_pdf():
-    logging.info("Iniciando conversão do PDF")
-    paginas_param = request.args.get('paginas', '')
-
-    if 'application/pdf' not in request.headers['Content-Type']:
-        return jsonify({"error": "Formato de arquivo não suportado"}), 400
-
-    file_content = request.data
-    if len(file_content) == 0:
-        return jsonify({"error": "Arquivo recebido está vazio"}), 400
-
-    temp_dir = tempfile.mkdtemp()
-    temp_path = os.path.join(temp_dir, "uploaded_file.pdf")
-
-    with open(temp_path, 'wb') as f:
-        f.write(file_content)
-
-    try:
-        texto_ocr = ocrizar_pdf(temp_path, paginas_param)
-    except Exception as e:
-        logging.error(f"Erro ao processar PDF: {e}")
-        return jsonify({"error": f"Falha ao processar PDF: {str(e)}"}), 500
-    finally:
-        os.remove(temp_path)
-        os.rmdir(temp_dir)
-
-    if texto_ocr:
-        return jsonify({"texto": texto_ocr}), 200
-    else:
-        return jsonify({"error": "Nenhum texto extraído do PDF"}), 200
+def convert():
+    # Assume-se que a imagem chega em formato binário via request.files (ajustar conforme necessário)
+    file_content = request.files['file'].read()
+    
+    paginas_param = request.form.get('paginas')
+    paginas = parse_paginas_param(paginas_param)
+    
+    # Pré-processamento da imagem
+    preprocessed_image = preprocess_image(file_content)
+    
+    # Salva a imagem pré-processada temporariamente para uso no pytesseract
+    with tempfile.NamedTemporaryFile(delete=False) as temp:
+        preprocessed_image.save(temp, format="PNG")
+        temp_path = temp.name
+    
+    # OCR usando pytesseract
+    text = pytesseract.image_to_string(temp_path, lang='por')  # Ajustar o idioma conforme necessário
+    
+    # Limpeza do arquivo temporário
+    os.remove(temp_path)
+    
+    return jsonify({"text": text})
 
 if __name__ == '__main__':
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)
