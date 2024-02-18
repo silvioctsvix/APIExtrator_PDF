@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import fitz  # PyMuPDF
 import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance
 import logging
 import tempfile
 import os
@@ -23,26 +23,18 @@ def parse_paginas_param(paginas_param):
                 paginas.append(int(parte))
     return paginas
 
-def preprocess_image(imagem_original):
-    logging.info("Preprocessando imagem para OCR")
-    # Aplicação de filtros para melhorar o OCR
-    imagem = ImageEnhance.Contrast(imagem_original).enhance(2.0)  # Aumentar contraste
-    imagem = imagem.convert('L').point(lambda x: 0 if x < 128 else 255, '1')  # Binarização
-    imagem = imagem.filter(ImageFilter.MedianFilter())  # Remoção de ruído
-    
-    return imagem
-
 def extrair_texto_ocr_de_pagina_com_imagem(pagina):
     logging.info("Extraindo texto OCR da página")
     texto_ocr = ''
     pix = pagina.get_pixmap()
     imagem_original = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    
-    # Preprocessamento da imagem
-    imagem_preprocessada = preprocess_image(imagem_original)
+
+    # Ajuste de contraste
+    enhancer = ImageEnhance.Contrast(imagem_original)
+    imagem_contrastada = enhancer.enhance(1.5)  # O fator de contraste, >1 aumenta o contraste
 
     custom_config = '--oem 1 --psm 3'
-    texto_ocr += pytesseract.image_to_string(imagem_preprocessada, lang='por', config=custom_config)
+    texto_ocr += pytesseract.image_to_string(imagem_contrastada, lang='por', config=custom_config)
     return texto_ocr
 
 def ocrizar_pdf(caminho_pdf, paginas_param):
