@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF, também conhecido como fitz
 import pytesseract
 from PIL import Image
 import logging
@@ -12,16 +12,15 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
 def parse_paginas_param(paginas_param):
-    if not paginas_param:
-        return []
     logging.info("Parsing páginas param")
     paginas = []
-    for parte in paginas_param.split(','):
-        if '-' in parte:
-            inicio, fim = map(int, parte.split('-'))
-            paginas.extend(range(inicio, fim + 1))
-        else:
-            paginas.append(int(parte))
+    if paginas_param:
+        for parte in paginas_param.split(','):
+            if '-' in parte:
+                inicio, fim = map(int, parte.split('-'))
+                paginas.extend(range(inicio, fim + 1))
+            else:
+                paginas.append(int(parte))
     return paginas
 
 def extrair_texto_ocr_de_pagina_com_imagem(pagina):
@@ -49,14 +48,14 @@ def ocrizar_pdf(caminho_pdf, paginas_param):
 @app.route('/convert', methods=['POST'])
 def convert_pdf():
     logging.info("Iniciando conversão do PDF")
-    # Verifica se o content-type é application/pdf
-    if 'application/pdf' not in request.headers.get('Content-Type', ''):
-        logging.error("Formato de arquivo não suportado")
+    # Agora, 'paginas' é obtido dos parâmetros de query da URL
+    paginas_param = request.args.get('paginas', '')
+
+    if 'application/pdf' not in request.headers['Content-Type']:
         return jsonify({"error": "Formato de arquivo não suportado"}), 400
 
     file_content = request.data
     if len(file_content) == 0:
-        logging.error("Arquivo recebido está vazio")
         return jsonify({"error": "Arquivo recebido está vazio"}), 400
 
     temp_dir = tempfile.mkdtemp()
@@ -65,7 +64,6 @@ def convert_pdf():
     with open(temp_path, 'wb') as f:
         f.write(file_content)
     
-    paginas_param = request.args.get('paginas', '')
     try:
         texto_ocr = ocrizar_pdf(temp_path, paginas_param)
     except Exception as e:
